@@ -165,7 +165,7 @@ F 3 "" H 2800 4250 50  0001 C CNN
 	1    2800 4250
 	1    0    0    -1  
 $EndComp
-Text HLabel 2050 5250 0    50   Output ~ 0
+Text HLabel 2050 4550 0    50   Output ~ 0
 VCAP
 $Comp
 L Device:Q_PMOS_GSD Q1
@@ -441,8 +441,6 @@ Wire Wire Line
 	2050 1900 3750 1900
 Wire Wire Line
 	4750 1900 5300 1900
-Wire Wire Line
-	2050 5250 5550 5250
 $Comp
 L power:PWR_FLAG #FLG01
 U 1 1 5FA3366D
@@ -454,9 +452,6 @@ F 3 "~" H 6350 4750 50  0001 C CNN
 	1    6350 4750
 	0    -1   -1   0   
 $EndComp
-Wire Wire Line
-	5550 5250 5550 5050
-Connection ~ 5550 5050
 Wire Wire Line
 	6350 5050 6350 5300
 Connection ~ 6350 4750
@@ -677,4 +672,9 @@ Wire Wire Line
 	3250 2450 3250 2650
 Text Notes 1500 3200 1    50   ~ 0
 EN_CHARGE must be Hi-Z while EN_PWR\nis switched on/off to avoid excessive\ninrush current. Must be kept Hi-Z while\nEN_PWR is low to avoid current\nthrough the op-amps ESD diodes.
+Wire Wire Line
+	2050 4550 4850 4550
+Wire Wire Line
+	4850 4550 4850 3800
+Connection ~ 4850 3800
 $EndSCHEMATC
