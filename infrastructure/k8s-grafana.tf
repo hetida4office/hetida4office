@@ -8,6 +8,9 @@ resource "kubernetes_pod" "grafana" {
     }
   }
   spec {
+    security_context {
+        fs_group = 0
+    }
     container {
       image = "grafana/grafana"
       name  = "grafana"
@@ -22,8 +25,11 @@ resource "kubernetes_pod" "grafana" {
     }
     volume {
       name = "grafana-data"
-      empty_dir {
-        size_limit = "50M"
+      azure_disk {
+          caching_mode = "None"
+          kind = "Managed"
+          disk_name = "hetida4office"
+          data_disk_uri = azurerm_managed_disk.h4o.id
       }
     }
   }
