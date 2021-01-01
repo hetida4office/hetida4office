@@ -68,7 +68,6 @@ static mqttsn_connect_opt_t m_fg_mqttsn_connect_opt;
 static mqttsn_remote_t m_fg_mqttsn_gateway_addr;
 static uint8_t m_fg_mqttsn_gateway_id;
 
-#define FG_MQTT_SENSOR_NAME s2
 #define FG_MQTT_TOPIC_NAME(topic) "h4o/" STRINGIFY(FG_MQTT_SENSOR_NAME) "/" STRINGIFY(topic)
 
 static const char * const m_fg_mqttsn_topic_names[FG_MQTT_TOPIC_NUM] = {FG_MQTT_TOPIC_NAME(press),

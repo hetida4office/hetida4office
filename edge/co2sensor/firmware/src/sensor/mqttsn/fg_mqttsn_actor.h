@@ -3,6 +3,8 @@
 
 #include "actor/fg_actor.h"
 
+#define FG_MQTT_SENSOR_NAME s1
+
 typedef enum
 {
     FG_MQTTSN_CONNECT,
