@@ -5,7 +5,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
 public class ConnectorMqttApplication {
-	public static void main(final String[] args) {
-		SpringApplication.run(ConnectorMqttApplication.class, args);
-	}
+    public static void main(final String[] args) {
+        SpringApplication.run(ConnectorMqttApplication.class, args);
+    }
 }
