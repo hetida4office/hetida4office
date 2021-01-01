@@ -68,9 +68,12 @@ static mqttsn_connect_opt_t m_fg_mqttsn_connect_opt;
 static mqttsn_remote_t m_fg_mqttsn_gateway_addr;
 static uint8_t m_fg_mqttsn_gateway_id;
 
-static const char * const m_fg_mqttsn_topic_names[FG_MQTT_TOPIC_NUM] = {"h4o/s1/press",
-    "h4o/s1/temp", "h4o/s1/hum", "h4o/s1/co2", "h4o/s1/bat",
-    "h4o/s1/msg"}; // TODO: pass in as parameter to init call.
+#define FG_MQTT_SENSOR_NAME s2
+#define FG_MQTT_TOPIC_NAME(topic) "h4o/" STRINGIFY(FG_MQTT_SENSOR_NAME) "/" STRINGIFY(topic)
+
+static const char * const m_fg_mqttsn_topic_names[FG_MQTT_TOPIC_NUM] = {FG_MQTT_TOPIC_NAME(press),
+    FG_MQTT_TOPIC_NAME(temp), FG_MQTT_TOPIC_NAME(hum), FG_MQTT_TOPIC_NAME(co2),
+    FG_MQTT_TOPIC_NAME(bat), FG_MQTT_TOPIC_NAME(msg)}; // TODO: pass in as parameter to init call.
 
 static mqttsn_topic_t m_fg_mqttsn_topics[FG_MQTT_TOPIC_NUM] = {
     {
