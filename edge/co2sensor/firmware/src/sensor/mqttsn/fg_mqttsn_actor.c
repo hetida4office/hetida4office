@@ -60,7 +60,7 @@ static otInstance * m_p_fg_mqttsn_thread_instance;
 #define FG_MQTTSN_MAX_FAILED_PUBACK_BEFORE_RECONNECT 3
 
 static char m_fg_mqttsn_client_id[] =
-    "fg_h4o_co2sensor"; // TODO: pass in as parameter to init call.
+    "fg_h4o_" STRINGIFY(FG_MQTT_SENSOR_NAME); // TODO: pass in as parameter to init call.
 static mqttsn_client_t m_fg_mqttsn_client;
 
 static mqttsn_connect_opt_t m_fg_mqttsn_connect_opt;
@@ -176,19 +176,20 @@ FG_ACTOR_SLOT(fg_mqttsn_publish)
     FG_ACTOR_STATE_TRANSITION(
         MQTTSN_KEEP_CONNECTED, MQTTSN_KEEP_CONNECTED, "publishing MQTTSN message");
 
-    if (m_fg_num_concurrent_messages == FG_MQTTSN_MAX_CONCURRENT_MESSAGES)
+    if (m_fg_num_concurrent_messages < FG_MQTTSN_MAX_CONCURRENT_MESSAGES)
+    {
+        m_fg_num_concurrent_messages++;
+        ASSERT(m_fg_num_concurrent_messages <= FG_MQTTSN_MAX_CONCURRENT_MESSAGES)
+
+        FG_ACTOR_GET_P_ARGS(fg_mqttsn_message_t, p_mqttsn_message, p_calling_action);
+        DRVX(nrf_atfifo_alloc_put(
+            m_p_fg_mqttsn_message_fifo, &p_mqttsn_message, sizeof(p_mqttsn_message), NULL));
+    }
+    else
     {
         NRFX_LOG_ERROR("Message buffer is full, dropped message.");
         FG_ACTOR_ERROR(p_calling_action, NRFX_ERROR_NO_MEM);
-        return;
     }
-
-    m_fg_num_concurrent_messages++;
-    ASSERT(m_fg_num_concurrent_messages <= FG_MQTTSN_MAX_CONCURRENT_MESSAGES)
-
-    FG_ACTOR_GET_P_ARGS(fg_mqttsn_message_t, p_mqttsn_message, p_calling_action);
-    DRVX(nrf_atfifo_alloc_put(
-        m_p_fg_mqttsn_message_fifo, &p_mqttsn_message, sizeof(p_mqttsn_message), NULL));
 
     DRVX(fg_mqttsn_progress());
 }
