@@ -440,8 +440,11 @@ static void fg_mqttsn_update_state(fg_mqttsn_event_t * p_event)
                                 p_event->mqtt_client_event->event_data.error.error);
                             fg_mqttsn_finish_activity(FG_MQTTSN_ACTIVITY_PUBLISHING);
                             num_failed_puback++;
-                            if (num_failed_puback >= FG_MQTTSN_MAX_FAILED_PUBACK_BEFORE_RECONNECT)
+                            if (num_failed_puback >= FG_MQTTSN_MAX_FAILED_PUBACK_BEFORE_RECONNECT ||
+                                p_event->mqtt_client_event->event_data.error.error ==
+                                    MQTTSN_ERROR_REJECTED_INVALID_TOPIC)
                             {
+                                num_failed_puback = 0;
                                 fg_mqttsn_gateway_state_reset();
                             }
                             break;

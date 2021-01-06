@@ -190,8 +190,9 @@ typedef enum mqttsn_event_id_t
 /**@brief MQTT-SN sending error the application shall handle. */
 typedef enum mqttsn_error_t
 {
-    MQTTSN_ERROR_REJECTED_CONGESTION, /**< Message has been rejected due to network congestion. */
-    MQTTSN_ERROR_TIMEOUT              /**< Retransmission limit has been reached. */
+    MQTTSN_ERROR_REJECTED_CONGESTION,    /**< Message has been rejected due to network congestion. */
+    MQTTSN_ERROR_REJECTED_INVALID_TOPIC, /**< Message has been rejected due to an invalid topic id. */
+    MQTTSN_ERROR_TIMEOUT                 /**< Retransmission limit has been reached. */
 } mqttsn_error_t;
 
 /**@brief MQTT-SN ACK message error. Is forwarded to the application when MQTTSN_EVENT_TIMEOUT occurs. */

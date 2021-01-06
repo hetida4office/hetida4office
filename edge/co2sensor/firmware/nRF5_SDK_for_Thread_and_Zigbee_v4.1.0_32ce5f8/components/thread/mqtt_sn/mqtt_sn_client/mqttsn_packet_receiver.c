@@ -71,18 +71,23 @@ mqttsn_ack_error_t mqttsn_packet_msgtype_error_get(const uint8_t * p_buffer)
     switch (msg_type)
     {
         case 0x04:
+        case 0x05:
             return MQTTSN_PACKET_CONNACK;
 
         case 0x0a:
+        case 0x0b:
             return MQTTSN_PACKET_REGACK;
 
         case 0x0c:
+        case 0x0d:
             return MQTTSN_PACKET_PUBACK;
 
         case 0x12:
+        case 0x13:
             return MQTTSN_PACKET_SUBACK;
 
         case 0x14:
+        case 0x15:
             return MQTTSN_PACKET_UNSUBACK;
 
         case 0x16:
@@ -478,7 +483,7 @@ static uint32_t puback_handle(mqttsn_client_t * p_client,
     {
         case MQTTSN_RC_REJECTED_CONGESTED:
         {
-            NRF_LOG_INFO("Register message was rejected. Reason: congestion.\r\n");
+            NRF_LOG_INFO("Publish message was rejected. Reason: congestion.\r\n");
 
             uint32_t fifo_dequeue_rc = mqttsn_packet_fifo_elem_dequeue(p_client, packet_id, MQTTSN_MESSAGE_ID);
             ASSERT(fifo_dequeue_rc == NRF_SUCCESS);
@@ -487,6 +492,25 @@ static uint32_t puback_handle(mqttsn_client_t * p_client,
             memset(&evt_rc, 0, sizeof(mqttsn_event_t)); 
             evt_rc.event_id                  = MQTTSN_EVENT_TIMEOUT;
             evt_rc.event_data.error.error    = MQTTSN_ERROR_REJECTED_CONGESTION;
+            evt_rc.event_data.error.msg_type = mqttsn_packet_msgtype_error_get(p_data);
+            evt_rc.event_data.error.msg_id   = 0;
+
+            p_client->evt_handler(p_client, &evt_rc);
+
+            return NRF_SUCCESS;
+        }
+
+        case MQTTSN_RC_REJECTED_INVALID_TOPIC_ID:
+        {
+            NRF_LOG_INFO("Publish message was rejected. Reason: invalid topic id.\r\n");
+
+            uint32_t fifo_dequeue_rc = mqttsn_packet_fifo_elem_dequeue(p_client, packet_id, MQTTSN_MESSAGE_ID);
+            ASSERT(fifo_dequeue_rc == NRF_SUCCESS);
+
+            mqttsn_event_t evt_rc;
+            memset(&evt_rc, 0, sizeof(mqttsn_event_t)); 
+            evt_rc.event_id                  = MQTTSN_EVENT_TIMEOUT;
+            evt_rc.event_data.error.error    = MQTTSN_ERROR_REJECTED_INVALID_TOPIC;
             evt_rc.event_data.error.msg_type = mqttsn_packet_msgtype_error_get(p_data);
             evt_rc.event_data.error.msg_id   = 0;
 
