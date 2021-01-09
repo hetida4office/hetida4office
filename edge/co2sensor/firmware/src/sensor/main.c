@@ -11,13 +11,9 @@
 #include <stdlib.h>
 #include <thread_utils.h>
 
-// TODO: Remove when bat measurement is moved to its own actor.
-#include "gpio/fg_gpio.h"
-#include "pins.h"
-
 
 FG_ACTOR_RESULT_HANDLERS_DEC(init_or_wakeup_result_handler, pressure_measurement_result_handler,
-    co2_measurement_result_handler);
+    co2_measurement_result_handler, mqttsn_sleep_handler);
 
 /** BME280 child actor resources */
 static const fg_actor_t * m_p_bme280_actor;
@@ -27,6 +23,7 @@ static const fg_actor_t * m_p_lp8_actor;
 
 /** RTC child actor resources */
 static const fg_actor_t * m_p_rtc_actor;
+static uint32_t m_main_mqttsn_sleep_ms;
 static uint32_t m_main_idle_time_ms;
 
 /** SAADC child actor resources */
@@ -51,7 +48,6 @@ static fg_mqttsn_message_t m_mqttsn_message[FG_MQTT_TOPIC_NUM] = {
 
 /** Main loop */
 
-// TODO: Let MQTTSN sleep between measurements.
 // TODO: connect gpio pin to sleep state and check whether the device is sleeping as intended.
 // TODO: Make sure EN_BLK_REVERSE is Hi-Z during reset to make sure that VCAP will not
 //       (reverse) aliment 3V3. Hide VCAP behind MOSFET.
@@ -110,6 +106,7 @@ FG_ACTOR_RESULT_HANDLER(init_or_wakeup_result_handler)
     const fg_actor_action_t * p_completed_action = FG_ACTOR_GET_FIRST_COMPLETED_ACTION();
     if (p_completed_action->p_actor == m_p_mqttsn_actor)
     {
+        // First iteration:
         ASSERT(p_completed_action->message.code == FG_MQTTSN_CONNECT)
         CHECK_COMPLETED_ACTION(p_completed_action, "MQTTSN gateway not found!");
 
@@ -125,20 +122,21 @@ FG_ACTOR_RESULT_HANDLER(init_or_wakeup_result_handler)
         ASSERT(p_completed_action->message.code == FG_SAADC_CALIBRATE)
         CHECK_COMPLETED_ACTION(p_completed_action, "SAADC calibration error!");
     }
-    else if (p_completed_action->p_actor == m_p_rtc_actor)
+    else
     {
+        // Subsequent iterations:
+        ASSERT(p_completed_action->p_actor == m_p_rtc_actor)
         ASSERT(p_completed_action->message.code == FG_RTC_START_TIMER);
         CHECK_COMPLETED_ACTION(p_completed_action, "RTC error!");
 
-        check_publish_action(p_completed_action->p_next_concurrent_action);
-    }
-    else
-    {
-        // Unexpected actor.
-        ASSERT(false)
+        p_completed_action = p_completed_action->p_next_concurrent_action;
+        ASSERT(p_completed_action != NULL);
+        ASSERT(p_completed_action->p_actor == m_p_mqttsn_actor)
+        ASSERT(p_completed_action->message.code == FG_MQTTSN_SLEEP)
+        CHECK_COMPLETED_ACTION(p_completed_action, "Error while trying to put MQTTSN gateway to sleep!");
     }
 
-    // Start measuring.
+    // (Re-)Start measuring.
     fg_actor_action_t * p_next_action = FG_ACTOR_POST_MESSAGE(bme280, FG_BME280_MEASURE);
     FG_ACTOR_SET_P_RESULT(p_next_action, fg_bme280_measurement_t, &bme280_measurement);
 
@@ -225,12 +223,31 @@ FG_ACTOR_RESULT_HANDLER(co2_measurement_result_handler)
         p_measurement_result->conc_filtered_pc, p_measurement_result->conc_pc,
         p_measurement_result->temperature);
 
-    fg_actor_action_t * p_next_action = FG_ACTOR_POST_MESSAGE(rtc, FG_RTC_START_TIMER);
-    m_main_idle_time_ms = fg_lp8_get_idle_time() * 1000;
-    FG_ACTOR_SET_ARGS(p_next_action, m_main_idle_time_ms);
 
     publish_measurement(
         p_next_transaction, p_measurement_result->conc_filtered_pc, FG_MQTT_TOPIC_CO2);
+
+    FG_ACTOR_SET_TRANSACTION_RESULT_HANDLER(mqttsn_sleep_handler);
+}
+
+FG_ACTOR_RESULT_HANDLER(mqttsn_sleep_handler)
+{
+    fg_actor_action_t * p_next_action;
+
+    const fg_actor_action_t * p_completed_action = FG_ACTOR_GET_FIRST_COMPLETED_ACTION();
+    check_publish_action(p_completed_action);
+
+    // Set timer for next measurement.
+    p_next_action = FG_ACTOR_POST_MESSAGE(rtc, FG_RTC_START_TIMER);
+    m_main_idle_time_ms = fg_lp8_get_idle_time() * 1000;
+    FG_ACTOR_SET_ARGS(p_next_action, m_main_idle_time_ms);
+
+    // Put MQTTSN client to sleep (i.e. thread reduce poll period and save energy).
+    // Obs: This message must always be protected by a timer in parallel
+    // as lost MQTTSN sleep/disconnect messages will not trigger a timeout.
+    p_next_action = FG_ACTOR_POST_MESSAGE(mqttsn, FG_MQTTSN_SLEEP);
+    m_main_mqttsn_sleep_ms = m_main_idle_time_ms + 1000;
+    FG_ACTOR_SET_ARGS(p_next_action, m_main_mqttsn_sleep_ms);
 
     FG_ACTOR_SET_TRANSACTION_RESULT_HANDLER(init_or_wakeup_result_handler);
 }

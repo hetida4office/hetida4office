@@ -48,16 +48,16 @@ FG_ACTOR_INTERFACE_LOCAL_DEC();
 
 static otInstance * m_p_fg_mqttsn_thread_instance;
 
-// TODO: Set higher timeouts if possible.
-#define FG_MQTT_THREAD_CHILD_TIMEOUT 40 // Thread child timeout [s].
+#define FG_MQTT_THREAD_CHILD_TIMEOUT                                                               \
+    65 // Thread child timeout [s] - must be higher than the max polling period.
 #define FG_MQTT_THREAD_SLEEP_TIMEOUT                                                               \
-    120 // Interval between gateway ping packages while sleeping [s].
-#define FG_MQTT_THREAD_SLEEP_POLL_PERIOD                                                           \
-    1000 // Thread Sleepy End Device polling period when MQTT-SN Asleep. [ms]
+    120 // Interval between MQTTSN gateway ping packages while sleeping [s].
 #define FG_MQTT_THREAD_AWAKE_POLL_PERIOD                                                           \
-    100 // Thread Sleepy End Device polling period when MQTT-SN Awake. [ms]
+    200 // Thread Sleepy End Device polling period when MQTT-SN Awake. [ms]
 #define FG_MQTT_SEARCH_GATEWAY_TIMEOUT 5 // MQTT-SN Gateway discovery procedure timeout in [s].
 #define FG_MQTTSN_MAX_FAILED_PUBACK_BEFORE_RECONNECT 3
+static uint32_t m_fg_requested_sleep_poll_period; // Thread Sleepy End Device polling period when
+                                                  // MQTT-SN Asleep. [ms]
 
 static char m_fg_mqttsn_client_id[] =
     "fg_h4o_" STRINGIFY(FG_MQTT_SENSOR_NAME); // TODO: pass in as parameter to init call.
@@ -125,7 +125,7 @@ static ret_code_t fg_mqttsn_thread_init(void)
     thread_configuration_t thread_configuration = {
         .radio_mode = THREAD_RADIO_MODE_RX_OFF_WHEN_IDLE,
         .autocommissioning = true,
-        .poll_period = FG_MQTT_THREAD_SLEEP_POLL_PERIOD,
+        .poll_period = FG_MQTT_THREAD_AWAKE_POLL_PERIOD,
         .default_child_timeout = FG_MQTT_THREAD_CHILD_TIMEOUT,
     };
 
@@ -173,8 +173,16 @@ static ret_code_t fg_mqttsn_progress();
 
 FG_ACTOR_SLOT(fg_mqttsn_publish)
 {
-    FG_ACTOR_STATE_TRANSITION(
-        MQTTSN_KEEP_CONNECTED, MQTTSN_KEEP_CONNECTED, "publishing MQTTSN message");
+    if (m_fg_actor_state == MQTTSN_KEEP_ASLEEP)
+    {
+        FG_ACTOR_STATE_TRANSITION(
+            MQTTSN_KEEP_ASLEEP, MQTTSN_KEEP_CONNECTED, "waking up and publishing MQTTSN message");
+    }
+    else
+    {
+        FG_ACTOR_STATE_TRANSITION(
+            MQTTSN_KEEP_CONNECTED, MQTTSN_KEEP_CONNECTED, "publishing MQTTSN message");
+    }
 
     if (m_fg_num_concurrent_messages < FG_MQTTSN_MAX_CONCURRENT_MESSAGES)
     {
@@ -196,9 +204,16 @@ FG_ACTOR_SLOT(fg_mqttsn_publish)
 
 FG_ACTOR_SLOT(fg_mqttsn_sleep)
 {
-    ASSERT(mqttsn_client_state_get(&m_fg_mqttsn_client) == MQTTSN_CLIENT_CONNECTED)
     FG_ACTOR_STATE_TRANSITION(
         MQTTSN_KEEP_CONNECTED, MQTTSN_KEEP_ASLEEP, "putting MQTTSN client to sleep");
+
+    // Get the sleep period (in ms) from the message.
+    FG_ACTOR_GET_ARGS(uint32_t, sleep_poll_period_ms, p_calling_action); // in ms.
+
+    // Make sure the sleep period is within valid bounds.
+    ASSERT(sleep_poll_period_ms > FG_MQTT_THREAD_AWAKE_POLL_PERIOD &&
+           sleep_poll_period_ms <= (FG_MQTT_THREAD_CHILD_TIMEOUT + 1) * 1000)
+    m_fg_requested_sleep_poll_period = sleep_poll_period_ms;
 
     FG_ACTOR_RUN_SINGLETON_TASK(fg_mqttsn_sleep_cb);
 
@@ -308,7 +323,9 @@ static void fg_mqttsn_start_activity(fg_mqttsn_activity_t started_activity)
 
 static void fg_mqttsn_thread_sleep()
 {
-    otError error = otLinkSetPollPeriod(thread_ot_instance_get(), FG_MQTT_THREAD_SLEEP_POLL_PERIOD);
+    ASSERT(m_fg_requested_sleep_poll_period > FG_MQTT_THREAD_AWAKE_POLL_PERIOD &&
+           m_fg_requested_sleep_poll_period <= (FG_MQTT_THREAD_CHILD_TIMEOUT + 1) * 1000)
+    otError error = otLinkSetPollPeriod(thread_ot_instance_get(), m_fg_requested_sleep_poll_period);
     ASSERT(error == OT_ERROR_NONE)
 }
 
@@ -516,7 +533,7 @@ static bool fg_mqttsn_finish_task_if_running(fg_actor_task_callback_t cb)
 static ret_code_t fg_schedule_next_queued_message()
 {
     ASSERT(m_fg_num_concurrent_messages > 0)
-    ASSERT(m_fg_actor_state == MQTTSN_KEEP_CONNECTED)
+    ASSERT(m_fg_actor_state == MQTTSN_KEEP_CONNECTED || m_fg_actor_state == MQTTSN_KEEP_ASLEEP)
 
     ret_code_t err_code;
     const fg_mqttsn_message_t * p_mqttsn_message;
