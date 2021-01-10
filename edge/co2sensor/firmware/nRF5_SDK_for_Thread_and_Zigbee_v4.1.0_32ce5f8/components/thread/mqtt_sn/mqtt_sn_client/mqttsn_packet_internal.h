@@ -83,6 +83,7 @@
 #define MQTTSN_MSGTYPE_SUBSCRIBE    0x12
 #define MQTTSN_MSGTYPE_UNSUBSCRIBE  0x14
 #define MQTTSN_MSGTYPE_PINGREQ      0x16
+#define MQTTSN_MSGTYPE_DISCONNECT   0x18
 #define MQTTSN_MSGTYPE_WILLTOPICUPD 0x1a
 #define MQTTSN_MSGTYPE_WILLMSGUPD   0x1c
 
@@ -110,6 +111,9 @@ typedef enum client_state_fsm_event_t
 
     TIMEOUT_SEARCHGW,               /**< Timeout occurred when waiting for GWINFO message. */
     TIMEOUT_CONNECT,                /**< CONNECT message retransmission limit has been reached. */
+    TIMEOUT_WILLTOPICUPD,           /**< WILLTOPICUPD message retransmission limit has been reached. */
+    TIMEOUT_WILLMSGUPD,             /**< WILLMSGUPD message retransmission limit has been reached. */
+    TIMEOUT_DISCONNECT,             /**< DISCONNECT message retransmission limit has been reached. */
     TIMEOUT_PINGREQ                 /**< PINGREQ message retransmission limit has been reached. */
 } client_state_fsm_event_t;
 

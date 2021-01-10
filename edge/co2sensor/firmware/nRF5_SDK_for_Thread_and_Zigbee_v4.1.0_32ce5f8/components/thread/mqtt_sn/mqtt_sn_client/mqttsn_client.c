@@ -197,7 +197,7 @@ static void message_retransmission_attempt(mqttsn_client_t * p_client, uint8_t i
                                                            MQTTSN_MESSAGE_TYPE);
                 ASSERT(err_code == NRF_SUCCESS);
 
-                mqttsn_client_state_update(p_client, TIMEOUT_CONNECT);
+                mqttsn_client_state_update(p_client, TIMEOUT_WILLTOPICUPD);
                 break;
 
             case MQTTSN_PACKET_WILLMSGUPD:
@@ -206,7 +206,16 @@ static void message_retransmission_attempt(mqttsn_client_t * p_client, uint8_t i
                                                            MQTTSN_MESSAGE_TYPE);
                 ASSERT(err_code == NRF_SUCCESS);
 
-                mqttsn_client_state_update(p_client, TIMEOUT_CONNECT);
+                mqttsn_client_state_update(p_client, TIMEOUT_WILLMSGUPD);
+                break;
+
+            case MQTTSN_PACKET_DISCONNECT:
+                err_code = mqttsn_packet_fifo_elem_dequeue(p_client,
+                                                           MQTTSN_MSGTYPE_DISCONNECT,
+                                                           MQTTSN_MESSAGE_TYPE);
+                ASSERT(err_code == NRF_SUCCESS);
+
+                mqttsn_client_state_update(p_client, TIMEOUT_DISCONNECT);
                 break;
 
             default:
@@ -283,6 +292,13 @@ static void keep_alive_transmission_attempt(mqttsn_client_t * p_client)
 
 void mqttsn_client_state_update(mqttsn_client_t * p_client, client_state_fsm_event_t fsm_event)
 {
+    if (fsm_event == RECEIVED_DISCONNECT)
+    {
+        p_client->client_state = MQTTSN_CLIENT_DISCONNECTED;
+        return;
+    }
+
+
     switch (p_client->client_state)
     {
         case MQTTSN_CLIENT_ASLEEP:
@@ -344,6 +360,8 @@ void mqttsn_client_state_update(mqttsn_client_t * p_client, client_state_fsm_eve
                     break;
 
                 case TIMEOUT_PINGREQ:
+                case TIMEOUT_WILLTOPICUPD:
+                case TIMEOUT_WILLMSGUPD:
                     p_client->client_state = MQTTSN_CLIENT_DISCONNECTED;
                     break;
 
@@ -405,6 +423,7 @@ void mqttsn_client_state_update(mqttsn_client_t * p_client, client_state_fsm_eve
             switch (fsm_event)
             {
                 case RECEIVED_DISCONNECT_PERMISSION:
+                case TIMEOUT_DISCONNECT:
                     p_client->client_state = MQTTSN_CLIENT_DISCONNECTED;
                     break;
 
@@ -423,6 +442,10 @@ void mqttsn_client_state_update(mqttsn_client_t * p_client, client_state_fsm_eve
                     p_client->client_state = MQTTSN_CLIENT_ASLEEP;
                     break;
 
+                case TIMEOUT_DISCONNECT:
+                    p_client->client_state = MQTTSN_CLIENT_DISCONNECTED;
+                    break;
+
                 default:
                     ASSERT(false);
                     break;
@@ -432,16 +455,8 @@ void mqttsn_client_state_update(mqttsn_client_t * p_client, client_state_fsm_eve
 
         default:
         {
-            switch (fsm_event)
-            {
-                case RECEIVED_DISCONNECT:
-                    p_client->client_state = MQTTSN_CLIENT_DISCONNECTED;
-                    break;
-
-                default:
-                    ASSERT(false);
-                    break;
-            }
+            ASSERT(false);
+            break;
         }
     }
 }

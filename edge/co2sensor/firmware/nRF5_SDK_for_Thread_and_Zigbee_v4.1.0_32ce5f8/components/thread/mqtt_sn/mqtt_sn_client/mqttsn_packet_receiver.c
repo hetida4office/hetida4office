@@ -91,12 +91,18 @@ mqttsn_ack_error_t mqttsn_packet_msgtype_error_get(const uint8_t * p_buffer)
             return MQTTSN_PACKET_UNSUBACK;
 
         case 0x16:
+        case 0x17:
             return MQTTSN_PACKET_PINGREQ;
 
+        case 0x18: // Disconnect response equals disconnect request.
+            return MQTTSN_PACKET_DISCONNECT;
+
         case 0x1a:
+        case 0x1b:
             return MQTTSN_PACKET_WILLTOPICUPD;
 
         case 0x1c:
+        case 0x1d:
             return MQTTSN_PACKET_WILLMSGUPD;
 
         default:
@@ -710,6 +716,11 @@ static uint32_t disconnect_handle(mqttsn_client_t * p_client)
     {
         case MQTTSN_CLIENT_WAITING_FOR_DISCONNECT:
         {
+            uint32_t fifo_dequeue_rc = mqttsn_packet_fifo_elem_dequeue(p_client,
+                                                                       MQTTSN_MSGTYPE_DISCONNECT,
+                                                                       MQTTSN_MESSAGE_TYPE);
+            ASSERT(fifo_dequeue_rc == NRF_SUCCESS);
+
             uint32_t timer_stop_rc = mqttsn_platform_timer_stop();
             ASSERT(timer_stop_rc == NRF_SUCCESS);
 
@@ -726,6 +737,11 @@ static uint32_t disconnect_handle(mqttsn_client_t * p_client)
 
         case MQTTSN_CLIENT_WAITING_FOR_SLEEP:
         {
+            uint32_t fifo_dequeue_rc = mqttsn_packet_fifo_elem_dequeue(p_client,
+                                                                       MQTTSN_MSGTYPE_DISCONNECT,
+                                                                       MQTTSN_MESSAGE_TYPE);
+            ASSERT(fifo_dequeue_rc == NRF_SUCCESS);
+
             p_client->keep_alive.timeout =
                 mqttsn_platform_timer_set_in_ms(p_client->keep_alive.duration);
 
@@ -906,6 +922,9 @@ static uint32_t message_handle(mqttsn_client_t        * p_client,
                                MQTTSN_msgTypes          message_type)
 {
     uint32_t err_code = NRF_ERROR_INVALID_STATE;
+
+    // TODO: If we are in the AWAKE state then we have to restart the PINGREQ timeout timer
+    // whenever a package other than PINGRESP is received.
 
     switch(message_type)
     {

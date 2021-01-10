@@ -34,7 +34,7 @@ FG_ACTOR_SLOTS_DEC(fg_mqttsn_connect, fg_mqttsn_publish, fg_mqttsn_sleep, fg_mqt
     }
 #define FG_MQTTSN_ACTOR_STATES                                                                     \
     {                                                                                              \
-        MQTTSN_UNINITIALIZED, MQTTSN_KEEP_CONNECTED, MQTTSN_KEEP_ASLEEP, MQTTSN_DISCONNECTED       \
+        MQTTSN_UNINITIALIZED, MQTTSN_KEEP_CONNECTED, MQTTSN_KEEP_ASLEEP, MQTTSN_KEEP_DISCONNECTED  \
     }
 
 FG_ACTOR_DEF(FG_MQTTSN_ACTOR_SLOT_ASSIGNMENT, FG_MQTTSN_ACTOR_STATES, FG_ACTOR_SINGLETON_TASK);
@@ -103,7 +103,7 @@ uint8_t m_fg_num_concurrent_messages = 0;
 
 
 /** Public API */
-FG_ACTOR_INIT_DEF(mqttsn, MQTTSN_UNINITIALIZED, MQTTSN_DISCONNECTED, fg_mqttsn_init);
+FG_ACTOR_INIT_DEF(mqttsn, MQTTSN_UNINITIALIZED, MQTTSN_KEEP_DISCONNECTED, fg_mqttsn_init);
 
 
 /** Internal implementation */
@@ -151,7 +151,7 @@ FG_ACTOR_SLOT(fg_mqttsn_connect)
 {
     ASSERT(!m_p_fg_mqttsn_thread_instance)
     FG_ACTOR_STATE_TRANSITION(
-        MQTTSN_DISCONNECTED, MQTTSN_KEEP_CONNECTED, "connecting MQTTSN client");
+        MQTTSN_KEEP_DISCONNECTED, MQTTSN_KEEP_CONNECTED, "connecting MQTTSN client");
 
     FG_ACTOR_RUN_SINGLETON_TASK(fg_mqttsn_connect_cb);
 
@@ -229,7 +229,7 @@ FG_ACTOR_TASK_CALLBACK(fg_mqttsn_sleep_cb)
 FG_ACTOR_SLOT(fg_mqttsn_disconnect)
 {
     FG_ACTOR_STATE_TRANSITION(
-        MQTTSN_KEEP_CONNECTED, MQTTSN_DISCONNECTED, "disconnecting MQTTSN client");
+        MQTTSN_KEEP_CONNECTED, MQTTSN_KEEP_DISCONNECTED, "disconnecting MQTTSN client");
 
     FG_ACTOR_RUN_SINGLETON_TASK(fg_mqttsn_disconnect_cb);
 
@@ -254,7 +254,7 @@ static void fg_mqttsn_gateway_state_reset()
 
 FG_ACTOR_TASK_CALLBACK(fg_mqttsn_disconnect_cb)
 {
-    ASSERT(m_fg_actor_state == MQTTSN_DISCONNECTED)
+    ASSERT(m_fg_actor_state == MQTTSN_KEEP_DISCONNECTED)
 
     DRVX(fg_mqttsn_message_state_reset());
     fg_mqttsn_gateway_state_reset();
@@ -367,8 +367,7 @@ static void fg_mqttsn_update_state(fg_mqttsn_event_t * p_event)
                     break;
 
                 case MQTTSN_EVENT_DISCONNECTED:
-                    NRFX_LOG_INFO("MQTTSN client event: Disconnected.");
-                    fg_mqttsn_finish_activity(FG_MQTTSN_ACTIVITY_DISCONNECTING);
+                    NRFX_LOG_INFO("MQTTSN client event: Disconnected by gateway.");
                     break;
 
                 case MQTTSN_EVENT_DISCONNECT_PERMIT:
@@ -466,8 +465,23 @@ static void fg_mqttsn_update_state(fg_mqttsn_event_t * p_event)
                             }
                             break;
 
+                        case MQTTSN_PACKET_DISCONNECT:
+                            NRFX_LOG_ERROR(
+                                "MQTTSN client event: Disconnection failed: Error Type: %d.",
+                                p_event->mqtt_client_event->event_data.error.error);
+                            if (m_fg_actor_state == MQTTSN_KEEP_ASLEEP)
+                            {
+                                fg_mqttsn_finish_activity(FG_MQTTSN_ACTIVITY_GOING_TO_SLEEP);
+                            }
+                            else if (m_fg_actor_state == MQTTSN_KEEP_DISCONNECTED)
+                            {
+                                fg_mqttsn_finish_activity(FG_MQTTSN_ACTIVITY_DISCONNECTING);
+                            }
+                            break;
+
                         default:
-                            NRFX_LOG_ERROR("MQTTSN client event: Packet rejected: Error Type: %d - "
+                            NRFX_LOG_ERROR("MQTTSN client event: Packet rejected or timed out: "
+                                           "Error Type: %d - "
                                            "Package Type: %d.",
                                 p_event->mqtt_client_event->event_data.error.error,
                                 p_event->mqtt_client_event->event_data.error.msg_type);
@@ -560,6 +574,46 @@ static ret_code_t fg_schedule_next_queued_message()
     return NRFX_SUCCESS;
 }
 
+#define FG_MQTTSN_RETCODE_IS_CONNECTED 999
+
+static ret_code_t fg_mqttsn_ensure_connected()
+{
+    ret_code_t err_code;
+
+    if (otLinkGetPollPeriod(thread_ot_instance_get()) != FG_MQTT_THREAD_AWAKE_POLL_PERIOD)
+    {
+        fg_mqttsn_thread_wake_up();
+    }
+
+    if (!fg_mqttsn_is_gateway_known())
+    {
+        if (!fg_mqttsn_is_disconnected())
+        {
+            err_code = mqttsn_client_disconnect(&m_fg_mqttsn_client);
+            if (err_code == NRFX_SUCCESS)
+                fg_mqttsn_start_activity(FG_MQTTSN_ACTIVITY_DISCONNECTING);
+            return err_code;
+        }
+
+        err_code =
+            mqttsn_client_search_gateway(&m_fg_mqttsn_client, FG_MQTT_SEARCH_GATEWAY_TIMEOUT);
+        if (err_code == NRFX_SUCCESS)
+            fg_mqttsn_start_activity(FG_MQTTSN_ACTIVITY_SEARCHING_GATEWAY);
+        return err_code;
+    }
+
+    if (fg_mqttsn_is_disconnected() || fg_mqttsn_is_asleep())
+    {
+        err_code = mqttsn_client_connect(&m_fg_mqttsn_client, &m_fg_mqttsn_gateway_addr,
+            m_fg_mqttsn_gateway_id, &m_fg_mqttsn_connect_opt);
+        if (err_code == NRFX_SUCCESS)
+            fg_mqttsn_start_activity(FG_MQTTSN_ACTIVITY_CONNECTING);
+        return err_code;
+    }
+
+    return FG_MQTTSN_RETCODE_IS_CONNECTED;
+}
+
 static ret_code_t fg_mqttsn_progress()
 {
     if (!fg_mqttsn_is_transport_available() || fg_mqttsn_is_busy())
@@ -570,36 +624,9 @@ static ret_code_t fg_mqttsn_progress()
     bool has_pending_message = m_fg_num_concurrent_messages > 0;
     if (has_pending_message || m_fg_actor_state == MQTTSN_KEEP_CONNECTED)
     {
-        if (otLinkGetPollPeriod(thread_ot_instance_get()) != FG_MQTT_THREAD_AWAKE_POLL_PERIOD)
-        {
-            fg_mqttsn_thread_wake_up();
-        }
-
-        if (!fg_mqttsn_is_gateway_known())
-        {
-            if (!fg_mqttsn_is_disconnected())
-            {
-                err_code = mqttsn_client_disconnect(&m_fg_mqttsn_client);
-                if (err_code == NRFX_SUCCESS)
-                    fg_mqttsn_start_activity(FG_MQTTSN_ACTIVITY_DISCONNECTING);
-                return err_code;
-            }
-
-            err_code =
-                mqttsn_client_search_gateway(&m_fg_mqttsn_client, FG_MQTT_SEARCH_GATEWAY_TIMEOUT);
-            if (err_code == NRFX_SUCCESS)
-                fg_mqttsn_start_activity(FG_MQTTSN_ACTIVITY_SEARCHING_GATEWAY);
+        err_code = fg_mqttsn_ensure_connected();
+        if (err_code != FG_MQTTSN_RETCODE_IS_CONNECTED)
             return err_code;
-        }
-
-        if (fg_mqttsn_is_disconnected() || fg_mqttsn_is_asleep())
-        {
-            err_code = mqttsn_client_connect(&m_fg_mqttsn_client, &m_fg_mqttsn_gateway_addr,
-                m_fg_mqttsn_gateway_id, &m_fg_mqttsn_connect_opt);
-            if (err_code == NRFX_SUCCESS)
-                fg_mqttsn_start_activity(FG_MQTTSN_ACTIVITY_CONNECTING);
-            return err_code;
-        }
 
         for (uint8_t topic = 0; topic < FG_MQTT_TOPIC_NUM; topic++)
         {
@@ -624,27 +651,33 @@ static ret_code_t fg_mqttsn_progress()
     if (m_fg_actor_state == MQTTSN_KEEP_ASLEEP)
     {
         if (fg_mqttsn_is_asleep())
-            fg_mqttsn_finish_task_if_running(fg_mqttsn_sleep_cb);
-        else
         {
-            err_code = mqttsn_client_sleep(&m_fg_mqttsn_client, FG_MQTT_THREAD_SLEEP_TIMEOUT);
-            if (err_code == NRFX_SUCCESS)
-                fg_mqttsn_start_activity(FG_MQTTSN_ACTIVITY_GOING_TO_SLEEP);
-            return err_code;
+            fg_mqttsn_finish_task_if_running(fg_mqttsn_sleep_cb);
+            return NRFX_SUCCESS;
         }
+
+        err_code = fg_mqttsn_ensure_connected();
+        if (err_code != FG_MQTTSN_RETCODE_IS_CONNECTED)
+            return err_code;
+
+        err_code = mqttsn_client_sleep(&m_fg_mqttsn_client, FG_MQTT_THREAD_SLEEP_TIMEOUT);
+        if (err_code == NRFX_SUCCESS)
+            fg_mqttsn_start_activity(FG_MQTTSN_ACTIVITY_GOING_TO_SLEEP);
+        return err_code;
     }
 
-    if (m_fg_actor_state == MQTTSN_DISCONNECTED)
+    if (m_fg_actor_state == MQTTSN_KEEP_DISCONNECTED)
     {
         if (fg_mqttsn_is_disconnected())
-            fg_mqttsn_finish_task_if_running(fg_mqttsn_disconnect_cb);
-        else
         {
-            err_code = mqttsn_client_disconnect(&m_fg_mqttsn_client);
-            if (err_code == NRFX_SUCCESS)
-                fg_mqttsn_start_activity(FG_MQTTSN_ACTIVITY_DISCONNECTING);
-            return err_code;
+            fg_mqttsn_finish_task_if_running(fg_mqttsn_disconnect_cb);
+            return NRFX_SUCCESS;
         }
+
+        err_code = mqttsn_client_disconnect(&m_fg_mqttsn_client);
+        if (err_code == NRFX_SUCCESS)
+            fg_mqttsn_start_activity(FG_MQTTSN_ACTIVITY_DISCONNECTING);
+        return err_code;
     }
 
     return NRFX_SUCCESS;

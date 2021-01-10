@@ -198,14 +198,15 @@ typedef enum mqttsn_error_t
 /**@brief MQTT-SN ACK message error. Is forwarded to the application when MQTTSN_EVENT_TIMEOUT occurs. */
 typedef enum mqttsn_ack_error_t 
 {
-    MQTTSN_PACKET_CONNACK,      /**< CONNACK message has not been received. */
-    MQTTSN_PACKET_REGACK,       /**< REGACK message has not been received. */
-    MQTTSN_PACKET_PUBACK,       /**< PUBACK message has not been received. */
-    MQTTSN_PACKET_SUBACK,       /**< SUBACK message has not been received. */
-    MQTTSN_PACKET_UNSUBACK,     /**< UNSUBACK message has not been received. */
-    MQTTSN_PACKET_PINGREQ,      /**< PINGREQ message has not been received. */
-    MQTTSN_PACKET_WILLTOPICUPD, /**< WILLTOPICUPD message has not been received. */
-    MQTTSN_PACKET_WILLMSGUPD,   /**< WILLMSGUPD message has not been received. */
+    MQTTSN_PACKET_CONNACK,      /**< Error sending CONNECT message or CONNACK message has not been received. */
+    MQTTSN_PACKET_REGACK,       /**< Error sending REGISTER message or REGACK message has not been received. */
+    MQTTSN_PACKET_PUBACK,       /**< Error sending PUBLISH message or PUBACK message has not been received. */
+    MQTTSN_PACKET_SUBACK,       /**< Error sending SUBSCRIBE message or SUBACK message has not been received. */
+    MQTTSN_PACKET_UNSUBACK,     /**< Error sending UNSUBSCRIBE message or UNSUBACK message has not been received. */
+    MQTTSN_PACKET_PINGREQ,      /**< Error sending PINGREQ message or PINGRESP message has not been received. */
+    MQTTSN_PACKET_DISCONNECT,   /**< Error sending DISCONNECT message or DISCONNECT response message has not been received */
+    MQTTSN_PACKET_WILLTOPICUPD, /**< Error sending WILLTOPICUPD message or WILLTOPICRESP has not been received. */
+    MQTTSN_PACKET_WILLMSGUPD,   /**< Error sending WILLMSGUPD message or WillMSGRESP has not been received. */
     MQTTSN_PACKET_INCORRECT     /**< Unknown error. */
 } mqttsn_ack_error_t;
 

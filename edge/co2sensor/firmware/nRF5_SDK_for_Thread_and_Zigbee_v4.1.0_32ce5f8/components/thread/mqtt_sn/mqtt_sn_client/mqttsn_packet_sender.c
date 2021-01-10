@@ -760,6 +760,7 @@ uint32_t mqttsn_packet_sender_disconnect(mqttsn_client_t * p_client, uint16_t du
     }
 
     uint8_t * p_data = nrf_malloc(packet_len);
+    uint8_t * p_packet_copy = NULL;
 
     do
     {
@@ -777,6 +778,39 @@ uint32_t mqttsn_packet_sender_disconnect(mqttsn_client_t * p_client, uint16_t du
             break;
         }
 
+        p_packet_copy = nrf_malloc(datalen);
+        if (p_packet_copy == NULL)
+        {
+            err_code = NRF_ERROR_NO_MEM;
+            break;
+        }
+
+        memcpy(p_packet_copy, p_data, datalen);
+
+        mqttsn_packet_t retransmission_packet;
+        memset(&retransmission_packet, 0, sizeof(mqttsn_packet_t));
+        retransmission_packet.retransmission_cnt = MQTTSN_DEFAULT_RETRANSMISSION_CNT;
+        retransmission_packet.p_data             = p_packet_copy;
+        retransmission_packet.len                = datalen;
+        retransmission_packet.timeout =
+            mqttsn_platform_timer_set_in_ms(MQTTSN_DEFAULT_RETRANSMISSION_TIME_IN_MS);
+
+        if (mqttsn_packet_fifo_elem_add(p_client, &retransmission_packet) != NRF_SUCCESS)
+        {
+            err_code = NRF_ERROR_NO_MEM;
+            break;
+        }
+
+        if (mqttsn_client_timeout_schedule(p_client) != NRF_SUCCESS)
+        {
+            uint32_t fifo_dequeue_rc = mqttsn_packet_fifo_elem_dequeue(p_client,
+                                                                       MQTTSN_MSGTYPE_DISCONNECT,
+                                                                       MQTTSN_MESSAGE_TYPE);
+            ASSERT(fifo_dequeue_rc == NRF_SUCCESS);
+            err_code = NRF_ERROR_INTERNAL;
+            break;
+        }
+
         err_code = mqttsn_packet_sender_send(p_client, &(p_client->gateway_info.addr), p_data, datalen);
 
     } while (0);
@@ -784,6 +818,11 @@ uint32_t mqttsn_packet_sender_disconnect(mqttsn_client_t * p_client, uint16_t du
     if (p_data)
     {
         nrf_free(p_data);
+    }
+
+    if (p_packet_copy && err_code != NRF_SUCCESS)
+    {
+        nrf_free(p_packet_copy);
     }
 
     return err_code;
