@@ -92,25 +92,46 @@ static uint32_t m_lp8_remaining_background_calibration_cycles;
 
 static bool m_lp8_is_initial_measurement;
 
-#define LP8_ERR0_FATAL_POS 0
-#define LP8_ERR0_ALG_POS 2
-#define LP8_ERR0_CALIBRATION_POS 3
-#define LP8_ERR0_SELF_DIAG_POS 4
-#define LP8_ERR0_OUT_OF_RANGE_POS 5
-#define LP8_ERR0_MEMORY_POS 6
-#define LP8_ERR1_VCAP1_LOW_POS 0
-#define LP8_ERR1_VCAP2_LOW_POS 2
-#define LP8_ERR1_ADC_POS 3
+typedef uint16_t lp8_err_t;
+typedef uint8_t lp8_err_oor_t;
 
-#define LP8_ERR0_FATAL_MASK 1 << LP8_ERR0_FATAL_POS
-#define LP8_ERR0_ALG_MASK 1 << LP8_ERR0_ALG_POS
-#define LP8_ERR0_CALIBRATION_MASK 1 << LP8_ERR0_CALIBRATION_POS
-#define LP8_ERR0_SELF_DIAG_MASK 1 << LP8_ERR0_SELF_DIAG_POS
-#define LP8_ERR0_OUT_OF_RANGE_MASK 1 << LP8_ERR0_OUT_OF_RANGE_POS
-#define LP8_ERR0_MEMORY_MASK 1 << LP8_ERR0_MEMORY_POS
-#define LP8_ERR1_VCAP1_LOW_MASK 1 << LP8_ERR1_VCAP1_LOW_POS
-#define LP8_ERR1_VCAP2_LOW_MASK 1 << LP8_ERR1_VCAP2_LOW_POS
-#define LP8_ERR1_ADC_MASK 1 << LP8_ERR1_ADC_POS
+// Error status 0 and 1 bitfield
+#define LP8_ERR_NONE (0U)
+#define LP8_ERR_FATAL (1U)
+#define LP8_ERR_ALG (1U << 2U)
+#define LP8_ERR_CALIBRATION (1U << 3U)
+#define LP8_ERR_SELF_DIAG (1U << 4U)
+#define LP8_ERR_OUT_OF_RANGE (1U << 5U)
+#define LP8_ERR_MEMORY (1U << 6U)
+#define LP8_ERR_VCAP1_LOW (1U << 8U)
+#define LP8_ERR_VCAP2_LOW (1U << 9U)
+#define LP8_ERR_ADC (1U << 10U)
+
+// Out or range error bits in error status 2 and 3 (when LP8_ERR0_OUT_OF_RANGE is set).
+#define LP8_ERR_OOR_NONE (0)
+#define LP8_ERR_OOR_SIGNAL (1)
+#define LP8_ERR_OOR_TEMP (1 << 1)
+#define LP8_ERR_OOR_TABLE (1 << 2)
+#define LP8_ERR_OOR_PRESS (1 << 3)
+
+typedef struct
+{
+    lp8_err_t mask; // LP8 error mask
+    char const * name;  // corresponding error code description
+} lp8_err_desc_t;
+#define LP8_ERR_DESC(errmask)                                                                      \
+    {                                                                                              \
+        .mask = errmask, .name = #errmask                                                          \
+    }
+
+static lp8_err_desc_t const m_lp8_err_descriptions[] = {LP8_ERR_DESC(LP8_ERR_FATAL),
+    LP8_ERR_DESC(LP8_ERR_ALG), LP8_ERR_DESC(LP8_ERR_CALIBRATION), LP8_ERR_DESC(LP8_ERR_SELF_DIAG),
+    LP8_ERR_DESC(LP8_ERR_OUT_OF_RANGE), LP8_ERR_DESC(LP8_ERR_MEMORY),
+    LP8_ERR_DESC(LP8_ERR_VCAP1_LOW), LP8_ERR_DESC(LP8_ERR_VCAP2_LOW), LP8_ERR_DESC(LP8_ERR_ADC)};
+
+static lp8_err_desc_t const m_lp8_err_oor_descriptions[] = {LP8_ERR_DESC(LP8_ERR_OOR_SIGNAL),
+    LP8_ERR_DESC(LP8_ERR_OOR_TEMP), LP8_ERR_DESC(LP8_ERR_OOR_TABLE),
+    LP8_ERR_DESC(LP8_ERR_OOR_PRESS)};
 
 // All values in LP8 memory/messages are big endian (MSB first),
 // signed 16 bit (S16) or unsigned 16 bit (U16), unless otherwise
@@ -136,7 +157,9 @@ typedef struct
                               // Celsius
     uint8_t vcap_start[2];    // 0xA0, VCAP voltage before measurement, U16, in mV
     uint8_t vcap_end[2];      // 0xA2, VCAP voltage after measurement, U16, in mV
-    uint8_t error_status[4];  // 0xA4, bit field
+    uint8_t err_oor_filtered; // 0xA4, bit field - OOR error filtered measurement
+    uint8_t err_oor;          // 0xA5, bit field - OOR error raw measurement
+    uint8_t err[2];           // 0xA6, bit field - error indicator
     uint8_t conc_filtered[2]; // 0xA8, filtered concentration value, S16, in ppm
     uint8_t
         conc_filtered_pc[2]; // 0xAA, pressure corrected filtered concentration value, S16, in ppm
@@ -311,6 +334,8 @@ uint8_t fg_lp8_get_idle_time() {
 
 static void fg_send_modbus_adu(
     FG_ACTOR_RESULT_HANDLER_ARGS_DEC, fg_uart_actor_rxtx_buffer_t * tx_buffer);
+
+static char const * lp8_log_error(lp8_err_t error, lp8_err_oor_t error_oor, lp8_err_oor_t error_oor_filtered);
 
 FG_ACTOR_SLOT(fg_lp8_measure_charge)
 {
@@ -512,25 +537,37 @@ FG_ACTOR_RESULT_HANDLER(fg_lp8_measure_finalize)
 
     fg_lp8_read_response_t * p_read_response_pdu =
         (fg_lp8_read_response_t *)&lp8_read_response_adu[LP8_MODBUS_ADU_PDU_OFFSET];
-    // TODO: check for read error response in read response PDU
     ASSERT(p_read_response_pdu->ram_len == LP8_READ_LEN);
 
-    fg_lp8_ram_t * p_ram = (fg_lp8_ram_t *)p_read_response_pdu->ram;
-    memcpy(m_lp8_sensor_state, p_ram->sensor_state, sizeof(m_lp8_sensor_state));
-
-    const fg_actor_action_t * const p_calling_action = p_completed_transaction->p_calling_action;
+    fg_actor_action_t * const p_calling_action = p_completed_transaction->p_calling_action;
     ASSERT(p_calling_action)
     ASSERT(p_calling_action->result_size == sizeof(fg_lp8_measurement_t))
     ASSERT(p_calling_action->p_result)
-
     fg_lp8_measurement_t * const p_measurement = p_calling_action->p_result;
-    p_measurement->conc = ((int16_t)p_ram->conc[0] << 8) + p_ram->conc[1];
-    p_measurement->conc_filtered =
-        ((int16_t)p_ram->conc_filtered[0] << 8) + p_ram->conc_filtered[1];
-    p_measurement->conc_pc = ((int16_t)p_ram->conc_pc[0] << 8) + p_ram->conc_pc[1];
-    p_measurement->conc_filtered_pc =
-        ((int16_t)p_ram->conc_filtered_pc[0] << 8) + p_ram->conc_filtered_pc[1];
-    p_measurement->temperature = ((int16_t)p_ram->temperature[0] << 8) + p_ram->temperature[1];
+
+    fg_lp8_ram_t * p_ram = (fg_lp8_ram_t *)p_read_response_pdu->ram;
+
+    lp8_err_t err_code = uint16_big_decode(p_ram->err);
+    if (err_code == LP8_ERR_NONE)
+    {
+        memcpy(m_lp8_sensor_state, p_ram->sensor_state, sizeof(m_lp8_sensor_state));
+        p_measurement->conc = uint16_big_decode(p_ram->conc);
+        p_measurement->conc_filtered = uint16_big_decode(p_ram->conc_filtered);
+        p_measurement->conc_pc = uint16_big_decode(p_ram->conc_pc);
+        p_measurement->conc_filtered_pc = uint16_big_decode(p_ram->conc_filtered_pc);
+        p_measurement->temperature = uint16_big_decode(p_ram->temperature);
+
+        if (p_measurement->conc_filtered <= 0 || p_measurement->conc_filtered >= 10000)
+        {
+            NRFX_LOG_WARNING("Measurement out of range.");
+        }
+    }
+    else
+    {
+        lp8_log_error(err_code, p_ram->err_oor, p_ram->err_oor_filtered);
+        memset(p_measurement, 0, sizeof(fg_lp8_measurement_t));
+        FG_ACTOR_ERROR(p_calling_action, NRFX_ERROR_INTERNAL);
+    }
 
     FG_ACTOR_SET_TRANSACTION_RESULT_HANDLER(fg_lp8_measure_finished);
 }
@@ -629,6 +666,46 @@ static uint16_t calc_modbus_crc(uint8_t * buf, int len)
     }
 
     return crc;
+}
+
+static char const * lp8_log_error_internal(lp8_err_t error)
+{
+    for (uint8_t error_idx = 0; error_idx < ARRAY_SIZE(m_lp8_err_descriptions); error_idx++)
+    {
+        if (m_lp8_err_descriptions[error_idx].mask & error)
+        {
+            NRFX_LOG_ERROR("LP8 error: code %s.", m_lp8_err_descriptions[error_idx].name);
+        }
+    }
+    return NULL;
+}
+
+static char const * lp8_log_oor_error_internal(lp8_err_oor_t error_oor, bool is_filtered)
+{
+    for (uint8_t error_idx; error_idx < ARRAY_SIZE(m_lp8_err_oor_descriptions); error_idx++)
+    {
+        if (m_lp8_err_descriptions[error_idx].mask & error_oor)
+        {
+            NRFX_LOG_ERROR("LP8 OOR error in %s result: code %s.", is_filtered ? "filtered" : "raw",
+                m_lp8_err_descriptions[error_idx].name);
+        }
+    }
+    return NULL;
+}
+
+static char const * lp8_log_error(
+    lp8_err_t error, lp8_err_oor_t error_oor, lp8_err_oor_t error_oor_filtered)
+{
+    ASSERT(error != LP8_ERR_NONE)
+    return lp8_log_error_internal(error);
+    if (error_oor != LP8_ERR_OOR_NONE)
+    {
+        lp8_log_oor_error_internal(error_oor, false);
+    }
+    if (error_oor_filtered != LP8_ERR_OOR_NONE)
+    {
+        lp8_log_oor_error_internal(error_oor_filtered, true);
+    }
 }
 
 FG_ACTOR_INTERFACE_DEF(lp8, fg_lp8_actor_message_code_t)
