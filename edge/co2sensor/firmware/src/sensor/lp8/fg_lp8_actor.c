@@ -47,7 +47,8 @@ FG_ACTOR_INTERFACE_LOCAL_DEC();
 /** LP8 resources */
 // Time between LP8 measurements
 #define FG_LP8_IDLE_TIME_S 60 // time (in s) between LP8 measurements
-#define FG_LP8_IDLE_TIME_BACKGROUND_CALIBRATION_S 5 // time (in s) between LP8 measurements while calibrating
+#define FG_LP8_IDLE_TIME_BACKGROUND_CALIBRATION_S                                                  \
+    5 // time (in s) between LP8 measurements while calibrating
 
 // Delay between switchin LP8 power on and end of rising
 // time, in ms.
@@ -57,7 +58,8 @@ FG_ACTOR_INTERFACE_LOCAL_DEC();
 #define LP8_VCAP_SATURATION_TIME_MS 500
 
 // Time between automatic calibrations in hours.
-#define LP8_TIME_BETWEEN_CALIBRATIONS_H (7*24) // recommended is about 8 days between ABC calibrations
+#define LP8_TIME_BETWEEN_CALIBRATIONS_H                                                            \
+    (7 * 24) // recommended is about 8 days between ABC calibrations
 
 // Number of measurement cycles between ABC calibrations:
 // Divide the desired calibration cycle in s by the number of seconds per measurement
@@ -264,7 +266,8 @@ void fg_lp8_calibration_requested()
 {
     m_lp8_remaining_background_calibration_cycles = LP8_BACKGROUND_CALIBRATION_CYCLES;
 }
-static const fg_bsp_assign_button_message_t m_fg_lp8_button_message = {.button_no = BSP_BOARD_BUTTON_0,
+static const fg_bsp_assign_button_message_t m_fg_lp8_button_message = {
+    .button_no = BSP_BOARD_BUTTON_0,
     .button_action = BSP_BUTTON_ACTION_LONG_PUSH,
     .button_event_handler = fg_lp8_calibration_requested};
 
@@ -328,8 +331,11 @@ void fg_lp8_init()
     fg_rtc_actor_init();
 }
 
-uint8_t fg_lp8_get_idle_time() {
-   return m_lp8_remaining_background_calibration_cycles > 0 ? FG_LP8_IDLE_TIME_BACKGROUND_CALIBRATION_S : FG_LP8_IDLE_TIME_S;
+uint8_t fg_lp8_get_idle_time()
+{
+    return m_lp8_remaining_background_calibration_cycles > 0
+               ? FG_LP8_IDLE_TIME_BACKGROUND_CALIBRATION_S
+               : FG_LP8_IDLE_TIME_S;
 }
 
 static void fg_send_modbus_adu(
@@ -433,7 +439,8 @@ FG_ACTOR_RESULT_HANDLER(fg_lp8_measure_cmd)
         if (m_lp8_remaining_background_calibration_cycles > 1)
         {
             // Measure normally while the sensor is exposed to fresh air.
-            NRF_LOG_INFO("another %d fresh air measurements", m_lp8_remaining_background_calibration_cycles);
+            NRF_LOG_INFO(
+                "another %d fresh air measurements", m_lp8_remaining_background_calibration_cycles);
             m_lp8_remaining_background_calibration_cycles--;
             p_ram->calculation_control = LP8_CC_SEQUENTIAL_MEASUREMENT;
         }
@@ -452,7 +459,8 @@ FG_ACTOR_RESULT_HANDLER(fg_lp8_measure_cmd)
     }
     else
     {
-        NRF_LOG_DEBUG("another %d measurements before ABC calibration", m_lp8_remaining_abc_calibration_cycles);
+        NRF_LOG_DEBUG("another %d measurements before ABC calibration",
+            m_lp8_remaining_abc_calibration_cycles);
         p_ram->calculation_control = LP8_CC_SEQUENTIAL_MEASUREMENT;
         if (m_lp8_remaining_abc_calibration_cycles > 0)
             m_lp8_remaining_abc_calibration_cycles--;
