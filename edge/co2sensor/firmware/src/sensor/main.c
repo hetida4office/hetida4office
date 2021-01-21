@@ -37,12 +37,12 @@ static const fg_actor_t * m_p_mqttsn_actor;
 static char m_mqttsn_message_buffer[FG_MQTT_TOPIC_NUM][FG_MQTT_MESSAGE_MAX_LEN];
 
 static fg_mqttsn_message_t m_mqttsn_message[FG_MQTT_TOPIC_NUM] = {
-  {.p_data = m_mqttsn_message_buffer[FG_MQTT_TOPIC_PRESSURE]},
-  {.p_data = m_mqttsn_message_buffer[FG_MQTT_TOPIC_TEMPERATURE]},
-  {.p_data = m_mqttsn_message_buffer[FG_MQTT_TOPIC_HUMIDITY]},
-  {.p_data = m_mqttsn_message_buffer[FG_MQTT_TOPIC_CO2]},
-  {.p_data = m_mqttsn_message_buffer[FG_MQTT_TOPIC_BAT]},
-  {.p_data = m_mqttsn_message_buffer[FG_MQTT_TOPIC_STATUS]},
+    {.topic_id = FG_MQTT_TOPIC_PRESSURE, .p_data = m_mqttsn_message_buffer[FG_MQTT_TOPIC_PRESSURE]},
+    {.topic_id = FG_MQTT_TOPIC_TEMPERATURE, .p_data = m_mqttsn_message_buffer[FG_MQTT_TOPIC_TEMPERATURE]},
+    {.topic_id = FG_MQTT_TOPIC_HUMIDITY, .p_data = m_mqttsn_message_buffer[FG_MQTT_TOPIC_HUMIDITY]},
+    {.topic_id = FG_MQTT_TOPIC_CO2, .p_data = m_mqttsn_message_buffer[FG_MQTT_TOPIC_CO2]},
+    {.topic_id = FG_MQTT_TOPIC_BAT, .p_data = m_mqttsn_message_buffer[FG_MQTT_TOPIC_BAT]},
+    {.topic_id = FG_MQTT_TOPIC_STATUS, .p_data = m_mqttsn_message_buffer[FG_MQTT_TOPIC_STATUS]},
 };
 
 
@@ -133,7 +133,8 @@ FG_ACTOR_RESULT_HANDLER(init_or_wakeup_result_handler)
         ASSERT(p_completed_action != NULL);
         ASSERT(p_completed_action->p_actor == m_p_mqttsn_actor)
         ASSERT(p_completed_action->message.code == FG_MQTTSN_SLEEP)
-        CHECK_COMPLETED_ACTION(p_completed_action, "Error while trying to put MQTTSN gateway to sleep!");
+        CHECK_COMPLETED_ACTION(
+            p_completed_action, "Error while trying to put MQTTSN gateway to sleep!");
     }
 
     // (Re-)Start measuring.
@@ -141,10 +142,11 @@ FG_ACTOR_RESULT_HANDLER(init_or_wakeup_result_handler)
     FG_ACTOR_SET_P_RESULT(p_next_action, fg_bme280_measurement_t, &bme280_measurement);
 
     m_main_saadc_remaining_measurements--;
-    if (m_main_saadc_remaining_measurements == 0) {
-      m_main_saadc_remaining_measurements = FG_SAADC_MEASUREMENT_CYCLES;
-      p_next_action = FG_ACTOR_POST_MESSAGE(saadc, FG_SAADC_MEASURE);
-      FG_ACTOR_SET_P_RESULT(p_next_action, fg_saadc_result_t, &saadc_bat_measurement);
+    if (m_main_saadc_remaining_measurements == 0)
+    {
+        m_main_saadc_remaining_measurements = FG_SAADC_MEASUREMENT_CYCLES;
+        p_next_action = FG_ACTOR_POST_MESSAGE(saadc, FG_SAADC_MEASURE);
+        FG_ACTOR_SET_P_RESULT(p_next_action, fg_saadc_result_t, &saadc_bat_measurement);
     }
 
     FG_ACTOR_SET_TRANSACTION_RESULT_HANDLER(pressure_measurement_result_handler);
@@ -153,10 +155,10 @@ FG_ACTOR_RESULT_HANDLER(init_or_wakeup_result_handler)
 static void publish_measurement(
     fg_actor_transaction_t * const p_next_transaction, int32_t measurement, uint16_t topic_id)
 {
-    snprintf(m_mqttsn_message_buffer[topic_id], sizeof(m_mqttsn_message_buffer[topic_id]), "%d", measurement);
+    snprintf(m_mqttsn_message_buffer[topic_id], sizeof(m_mqttsn_message_buffer[topic_id]), "%d",
+        measurement);
     m_mqttsn_message[topic_id].size = strlen(m_mqttsn_message_buffer[topic_id]);
     ASSERT(m_mqttsn_message[topic_id].size <= sizeof(m_mqttsn_message_buffer[topic_id]));
-    m_mqttsn_message[topic_id].topic_id = topic_id;
 
     fg_actor_action_t * p_next_action = FG_ACTOR_POST_MESSAGE(mqttsn, FG_MQTTSN_PUBLISH);
     FG_ACTOR_SET_ARGS(p_next_action, m_mqttsn_message[topic_id]);
@@ -191,13 +193,14 @@ FG_ACTOR_RESULT_HANDLER(pressure_measurement_result_handler)
     publish_measurement(p_next_transaction, p_measurement_result->pressure, FG_MQTT_TOPIC_PRESSURE);
 
     // Publish battery voltage if measured
-    if (p_completed_action->p_next_concurrent_action != NULL) {
-      p_completed_action = p_completed_action->p_next_concurrent_action;
-      ASSERT(p_completed_action->p_actor == m_p_saadc_actor)
-      ASSERT(p_completed_action->message.code == FG_SAADC_MEASURE)
-      FG_ACTOR_GET_P_RESULT(fg_saadc_result_t, p_saadc_result, p_completed_action);
-      NRF_LOG_INFO("Measurement: battery: %u", *p_saadc_result);
-      publish_measurement(p_next_transaction, *p_saadc_result, FG_MQTT_TOPIC_BAT);
+    if (p_completed_action->p_next_concurrent_action != NULL)
+    {
+        p_completed_action = p_completed_action->p_next_concurrent_action;
+        ASSERT(p_completed_action->p_actor == m_p_saadc_actor)
+        ASSERT(p_completed_action->message.code == FG_SAADC_MEASURE)
+        FG_ACTOR_GET_P_RESULT(fg_saadc_result_t, p_saadc_result, p_completed_action);
+        NRF_LOG_INFO("Measurement: battery: %u", *p_saadc_result);
+        publish_measurement(p_next_transaction, *p_saadc_result, FG_MQTT_TOPIC_BAT);
     }
 
     FG_ACTOR_SET_TRANSACTION_RESULT_HANDLER(co2_measurement_result_handler);
