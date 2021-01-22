@@ -9,7 +9,7 @@ resource "kubernetes_pod" "connector-mqtt" {
   }
   spec {
     container {
-      image = "hetida4office/connector-mqtt:0.0.10"
+      image = "hetida4office/connector-mqtt:0.0.11"
       name  = "connector-mqtt"
       env {
         name = "SPRING_PROFILES_ACTIVE"
@@ -30,7 +30,7 @@ resource "kubernetes_pod" "kafka-consumer" {
   }
   spec {
     container {
-      image = "hetida4office/kafka-consumer:0.0.10"
+      image = "hetida4office/kafka-consumer:0.0.11"
       name  = "kafka-consumer"
       env {
         name = "SPRING_PROFILES_ACTIVE"
