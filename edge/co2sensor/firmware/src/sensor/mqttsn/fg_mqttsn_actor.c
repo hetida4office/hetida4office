@@ -99,7 +99,7 @@ static mqttsn_topic_t m_fg_mqttsn_topics[FG_MQTT_TOPIC_NUM] = {
 static uint16_t m_fg_mqttsn_msg_id = 0;
 NRF_ATFIFO_DEF(
     m_p_fg_mqttsn_message_fifo, fg_mqttsn_message_t *, FG_MQTTSN_MAX_CONCURRENT_MESSAGES);
-uint8_t m_fg_num_concurrent_messages = 0;
+static uint8_t m_fg_num_concurrent_messages = 0;
 
 
 /** Public API */
@@ -301,7 +301,6 @@ typedef enum
     FG_MQTTSN_ACTIVITY_CONNECTING,
     FG_MQTTSN_ACTIVITY_REGISTERING_TOPIC,
     FG_MQTTSN_ACTIVITY_PUBLISHING,
-    FG_MQTTSN_ACTIVITY_GOING_TO_SLEEP,
     FG_MQTTSN_ACTIVITY_DISCONNECTING
 } fg_mqttsn_activity_t;
 
@@ -335,9 +334,26 @@ static void fg_mqttsn_thread_wake_up()
     ASSERT(error == OT_ERROR_NONE)
 }
 
+static uint8_t m_fg_mqttsn_num_lost_packages = 0;
+
+static void fg_mqttsn_package_noack(mqttsn_error_t error)
+{
+    m_fg_mqttsn_num_lost_packages++;
+    if (m_fg_mqttsn_num_lost_packages >= FG_MQTTSN_MAX_FAILED_PUBACK_BEFORE_RECONNECT ||
+        error == MQTTSN_ERROR_REJECTED_INVALID_TOPIC)
+    {
+        m_fg_mqttsn_num_lost_packages = 0;
+        fg_mqttsn_gateway_state_reset();
+    }
+}
+
+static void fg_mqttsn_package_ack()
+{
+    m_fg_mqttsn_num_lost_packages = 0;
+}
+
 static void fg_mqttsn_update_state(fg_mqttsn_event_t * p_event)
 {
-    static uint8_t num_failed_puback = 0;
 
     switch (p_event->type)
     {
@@ -386,7 +402,7 @@ static void fg_mqttsn_update_state(fg_mqttsn_event_t * p_event)
                 case MQTTSN_EVENT_PUBLISHED:
                     NRFX_LOG_INFO("MQTTSN client event: Message published.");
                     fg_mqttsn_finish_activity(FG_MQTTSN_ACTIVITY_PUBLISHING);
-                    num_failed_puback = 0;
+                    fg_mqttsn_package_ack();
                     break;
 
                 case MQTTSN_EVENT_REGISTERED:
@@ -405,13 +421,14 @@ static void fg_mqttsn_update_state(fg_mqttsn_event_t * p_event)
                         }
                     }
                     fg_mqttsn_finish_activity(FG_MQTTSN_ACTIVITY_REGISTERING_TOPIC);
+                    fg_mqttsn_package_ack();
                     break;
                 }
 
                 case MQTTSN_EVENT_SLEEP_PERMIT:
                     NRFX_LOG_DEBUG("MQTTSN client event: Sleep permit.");
                     fg_mqttsn_thread_sleep();
-                    fg_mqttsn_finish_activity(FG_MQTTSN_ACTIVITY_GOING_TO_SLEEP);
+                    fg_mqttsn_finish_activity(FG_MQTTSN_ACTIVITY_DISCONNECTING);
                     break;
 
                 case MQTTSN_EVENT_SLEEP_STOP:
@@ -448,6 +465,7 @@ static void fg_mqttsn_update_state(fg_mqttsn_event_t * p_event)
                                 "MQTTSN client event: Topic registration failed: Error Type: %d.",
                                 p_event->mqtt_client_event->event_data.error.error);
                             fg_mqttsn_finish_activity(FG_MQTTSN_ACTIVITY_REGISTERING_TOPIC);
+                            fg_mqttsn_package_noack(p_event->mqtt_client_event->event_data.error.error);
                             break;
 
                         case MQTTSN_PACKET_PUBACK:
@@ -455,28 +473,14 @@ static void fg_mqttsn_update_state(fg_mqttsn_event_t * p_event)
                                 "MQTTSN client event: Message publication failed: Error Type: %d.",
                                 p_event->mqtt_client_event->event_data.error.error);
                             fg_mqttsn_finish_activity(FG_MQTTSN_ACTIVITY_PUBLISHING);
-                            num_failed_puback++;
-                            if (num_failed_puback >= FG_MQTTSN_MAX_FAILED_PUBACK_BEFORE_RECONNECT ||
-                                p_event->mqtt_client_event->event_data.error.error ==
-                                    MQTTSN_ERROR_REJECTED_INVALID_TOPIC)
-                            {
-                                num_failed_puback = 0;
-                                fg_mqttsn_gateway_state_reset();
-                            }
+                            fg_mqttsn_package_noack(p_event->mqtt_client_event->event_data.error.error);
                             break;
 
                         case MQTTSN_PACKET_DISCONNECT:
                             NRFX_LOG_ERROR(
                                 "MQTTSN client event: Disconnection failed: Error Type: %d.",
                                 p_event->mqtt_client_event->event_data.error.error);
-                            if (m_fg_actor_state == MQTTSN_KEEP_ASLEEP)
-                            {
-                                fg_mqttsn_finish_activity(FG_MQTTSN_ACTIVITY_GOING_TO_SLEEP);
-                            }
-                            else if (m_fg_actor_state == MQTTSN_KEEP_DISCONNECTED)
-                            {
                                 fg_mqttsn_finish_activity(FG_MQTTSN_ACTIVITY_DISCONNECTING);
-                            }
                             break;
 
                         default:
@@ -662,7 +666,7 @@ static ret_code_t fg_mqttsn_progress()
 
         err_code = mqttsn_client_sleep(&m_fg_mqttsn_client, FG_MQTT_THREAD_SLEEP_TIMEOUT);
         if (err_code == NRFX_SUCCESS)
-            fg_mqttsn_start_activity(FG_MQTTSN_ACTIVITY_GOING_TO_SLEEP);
+            fg_mqttsn_start_activity(FG_MQTTSN_ACTIVITY_DISCONNECTING);
         return err_code;
     }
 
