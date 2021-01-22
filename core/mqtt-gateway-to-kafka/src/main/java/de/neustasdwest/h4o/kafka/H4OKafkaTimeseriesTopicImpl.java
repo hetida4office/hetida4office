@@ -16,7 +16,7 @@ public class H4OKafkaTimeseriesTopicImpl implements H4OKafkaTimeseriesTopic {
     }
 
     @Override
-    public void sendTimeSeriesDecimals(final List<Measurement> measurement) {
-        h4oKafkaTimeseriesProducer.sendDecimalValues(measurement);
+    public void sendMeasurements(final List<Measurement> measurements) {
+        h4oKafkaTimeseriesProducer.sendMeasurements(measurements);
     }
 }

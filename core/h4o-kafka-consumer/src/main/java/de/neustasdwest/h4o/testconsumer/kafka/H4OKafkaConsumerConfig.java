@@ -46,8 +46,7 @@ public class H4OKafkaConsumerConfig {
 
     @Bean
     public Map<String, Object> consumerConfigs() {
-        final StringBuilder stringBuilder = new StringBuilder();
-        final String kafkaUrl = stringBuilder.append(kafkaHost).append(":").append(kafkaPort).toString();
+        final String kafkaUrl = kafkaHost + ":" + kafkaPort;
         final Map<String, Object> props = new HashMap<>();
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaUrl);
         props.put(ConsumerConfig.GROUP_ID_CONFIG, consumerGroup);

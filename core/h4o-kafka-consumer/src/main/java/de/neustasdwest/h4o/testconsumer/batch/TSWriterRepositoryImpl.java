@@ -14,10 +14,10 @@ import java.util.List;
 @Slf4j
 @Repository
 public class TSWriterRepositoryImpl implements TSWriterRepository {
+    private static final String INSERT_MEASUREMENTS_QUERY = "insert into timeseries.measurements (channel_id, timestamp, measurement) values(?,?,?)";
+
     private final JdbcTemplate jdbcTemplate;
     private final int batchSize;
-
-    private final String INSERT_MEASUREMENTS_QUERY = "insert into timeseries.measurements (channel_id, timestamp, measurement) values(?,?,?)";
 
     public TSWriterRepositoryImpl(@Value("${time.series.insert.batch_size}") final int batchSize, final JdbcTemplate jdbcTemplate) {
         this.batchSize = batchSize;

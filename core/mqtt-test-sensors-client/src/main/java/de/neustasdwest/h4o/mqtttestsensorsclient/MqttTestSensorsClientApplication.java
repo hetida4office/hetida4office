@@ -5,7 +5,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
 public class MqttTestSensorsClientApplication {
-	public static void main(String[] args) {
-		SpringApplication.run(MqttTestSensorsClientApplication.class, args);
-	}
+    public static void main(String[] args) {
+        SpringApplication.run(MqttTestSensorsClientApplication.class, args);
+    }
 }

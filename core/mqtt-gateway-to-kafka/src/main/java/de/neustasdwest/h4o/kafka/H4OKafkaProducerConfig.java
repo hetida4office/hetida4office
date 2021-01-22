@@ -26,9 +26,6 @@ class H4OKafkaProducerConfig {
 
     @Bean
     Map<String, Object> producerConfigs() {
-        final StringBuilder stringBuilder = new StringBuilder();
-        final String kafkaUrl = stringBuilder.append(kafkaHost).append(":").append(kafkaPort).toString();
-        
         final Map<String, Object> props = new HashMap<>();
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class);
@@ -41,6 +38,7 @@ class H4OKafkaProducerConfig {
         props.put(ProducerConfig.LINGER_MS_CONFIG, 100);
         props.put(ProducerConfig.BATCH_SIZE_CONFIG, BATCH_SIZE);
 
+        final String kafkaUrl = kafkaHost + ":" + kafkaPort;
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaUrl);
         return props;
     }

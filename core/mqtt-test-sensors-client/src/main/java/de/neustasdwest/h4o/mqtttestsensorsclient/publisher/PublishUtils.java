@@ -6,7 +6,7 @@ public class PublishUtils {
     private static final Random r = new Random();
 
     private static int getRandomNumber(int low, int high) {
-        return r.nextInt(high-low) + low;
+        return r.nextInt(high - low) + low;
     }
 
     public static int getFakeTempMeasurement() {

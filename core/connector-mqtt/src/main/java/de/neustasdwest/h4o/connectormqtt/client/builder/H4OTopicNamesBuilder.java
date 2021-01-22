@@ -9,6 +9,8 @@ import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
 
+import static java.lang.String.join;
+
 @Log4j2
 @Component
 public class H4OTopicNamesBuilder implements TopicNamesBuilder {
@@ -33,7 +35,7 @@ public class H4OTopicNamesBuilder implements TopicNamesBuilder {
         final Set<String> topics = new HashSet<>();
         Arrays.asList(topicsSuffixes).forEach(suffix -> {
             Arrays.asList(devicesNames).forEach(deviceName -> {
-                final String newTopicName = String.join("/", topicPrefix, deviceName, suffix);
+                final String newTopicName = join("/", topicPrefix, deviceName, suffix);
                 log.info(newTopicName);
                 topics.add(newTopicName);
             });

@@ -29,7 +29,7 @@ public class H4OMqttTopicToKafkaTimeseriesBridge {
                     final String topic = mqtt5Publish.getTopic().toString();
                     final Measurement measurement = buildMeasurement(topic, mqtt5Publish.getPayloadAsBytes());
                     log.info("Send {} to kafka...", measurement);
-                    h4oKafkaTimeseriesTopic.sendTimeSeriesDecimals(Collections.singletonList(measurement));
+                    h4oKafkaTimeseriesTopic.sendMeasurements(Collections.singletonList(measurement));
                 })
                 .send();
     }

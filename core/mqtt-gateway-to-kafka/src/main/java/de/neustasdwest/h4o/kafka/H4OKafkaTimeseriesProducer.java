@@ -11,9 +11,9 @@ import org.springframework.retry.annotation.EnableRetry;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Component;
 
-import static de.neustasdwest.h4o.common.serializer.MeasurementSerializer.serializeMeasurement;
-
 import java.util.List;
+
+import static de.neustasdwest.h4o.common.serializer.MeasurementSerializer.serializeMeasurement;
 
 @EnableRetry
 @Component
@@ -29,8 +29,8 @@ class H4OKafkaTimeseriesProducer {
     }
 
     @Retryable(include = {
-            KafkaProducerException.class }, maxAttemptsExpression = "#{${kafka.send.max.attempts}}", backoff = @Backoff(delayExpression = "#{${kafka.send.backoff.delay}}"))
-    void sendDecimalValues(final List<Measurement> measurements) {
+            KafkaProducerException.class}, maxAttemptsExpression = "#{${kafka.send.max.attempts}}", backoff = @Backoff(delayExpression = "#{${kafka.send.backoff.delay}}"))
+    void sendMeasurements(final List<Measurement> measurements) {
         measurements.forEach(measurement -> {
             try {
                 kafkaTemplate.send(topicTimeSeries, serializeMeasurement(measurement));

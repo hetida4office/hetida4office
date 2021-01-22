@@ -8,14 +8,9 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-import java.util.HashMap;
-import java.util.Map;
-
 @Log4j2
 @Component
 public class H4OMqttTopicsSubscriber {
-    private static final Map<String, H4OMqttTopicToKafkaTimeseriesBridge> h4oMqttTopicToKafkaTimeseriesBridges = new HashMap<>();
-
     private final H4OSingletonMqttClient h4oSingletonMqttClient;
     private final TopicNamesBuilder topicNamesBuilder;
     private final H4OKafkaTimeseriesTopic h4oKafkaTimeseriesTopic;
@@ -34,9 +29,7 @@ public class H4OMqttTopicsSubscriber {
         h4oSingletonMqttClient.connect();
         topicNamesBuilder.buildTopicNames().forEach(topicName -> {
             final H4OMqttTopicToKafkaTimeseriesBridge h4oMqttTopicToKafkaTimeseriesBridge = new H4OMqttTopicToKafkaTimeseriesBridge(topicName);
-            h4oMqttTopicToKafkaTimeseriesBridges.put(topicName, h4oMqttTopicToKafkaTimeseriesBridge);
-            log.info("Added new topic subscriber with name -> {}", topicName);
-            h4oMqttTopicToKafkaTimeseriesBridges.get(topicName).forwardMqttTo(h4oKafkaTimeseriesTopic);
+            h4oMqttTopicToKafkaTimeseriesBridge.forwardMqttTo(h4oKafkaTimeseriesTopic);
             log.info("Started Listening to topic -> {}", topicName);
         });
     }

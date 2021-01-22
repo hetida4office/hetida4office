@@ -19,9 +19,9 @@ CREATE TABLE metadata.thing_nodes
 
 CREATE TABLE metadata.things
 (
-    id            varchar(127) primary key,
-    name          varchar(127) not null,
-    description   varchar(255)
+    id          varchar(127) primary key,
+    name        varchar(127) not null,
+    description varchar(255)
 );
 
 CREATE TABLE metadata.thing_nodes_to_things
@@ -46,7 +46,7 @@ CREATE TABLE timeseries.messages
     channel_id varchar(127) not null references metadata.channels (id),
     timestamp  timestamp,
     message    varchar(255) not null,
-    PRIMARY KEY(timestamp, channel_id)
+    PRIMARY KEY (timestamp, channel_id)
 );
 
 CREATE TABLE timeseries.measurements
@@ -54,7 +54,7 @@ CREATE TABLE timeseries.measurements
     channel_id  varchar(127)   not null references metadata.Channels (id),
     timestamp   timestamp,
     measurement numeric(12, 6) not null,
-    PRIMARY KEY(timestamp, channel_id)
+    PRIMARY KEY (timestamp, channel_id)
 );
 
 CREATE TABLE timeseries.substitutions
@@ -62,7 +62,7 @@ CREATE TABLE timeseries.substitutions
     channel_id  varchar(127)   not null references metadata.Channels (id),
     timestamp   timestamp,
     measurement numeric(12, 6) not null,
-    PRIMARY KEY(timestamp, channel_id)
+    PRIMARY KEY (timestamp, channel_id)
 );
 
 -- Insert devices structure

@@ -5,5 +5,5 @@ import de.neustasdwest.h4o.common.model.Measurement;
 import java.util.List;
 
 public interface H4OKafkaTimeseriesTopic {
-    void sendTimeSeriesDecimals(List<Measurement> decimalValues);
+    void sendMeasurements(List<Measurement> measurements);
 }

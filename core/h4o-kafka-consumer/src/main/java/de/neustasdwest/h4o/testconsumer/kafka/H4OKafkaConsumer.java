@@ -1,20 +1,16 @@
 package de.neustasdwest.h4o.testconsumer.kafka;
 
-import static de.neustasdwest.h4o.common.deserializer.MeasurementDeserializer.deserializeMeasurement;
-import static java.util.Collections.singletonList;
-
-import java.io.IOException;
-
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.springframework.kafka.annotation.KafkaListener;
-import org.springframework.retry.annotation.Backoff;
-import org.springframework.retry.annotation.Retryable;
-import org.springframework.stereotype.Component;
-import org.springframework.web.client.ResourceAccessException;
-
 import de.neustasdwest.h4o.common.model.Measurement;
 import de.neustasdwest.h4o.testconsumer.batch.TSWriterRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.stereotype.Component;
+
+import java.io.IOException;
+
+import static de.neustasdwest.h4o.common.deserializer.MeasurementDeserializer.deserializeMeasurement;
+import static java.util.Collections.singletonList;
 
 @Slf4j
 @Component
@@ -26,11 +22,7 @@ public class H4OKafkaConsumer {
     }
 
     @KafkaListener(topics = "#{'${kafka.topic.channelvalue.name}'}")
-    @Retryable(
-            value = {ResourceAccessException.class},
-            maxAttempts = 3,
-            backoff = @Backoff(delay = 20000))
-    public void listen(final ConsumerRecord<String, byte[]> cr) throws IOException, InterruptedException {
+    public void listen(final ConsumerRecord<String, byte[]> cr) throws IOException {
         log.info("Consuming Topic {} record from partition {} with offset {}.", cr.topic(), cr.partition(), cr.offset());
         final Measurement measurement = deserializeMeasurement(cr.value());
         this.tsWriter.batchInsertMeasurements(singletonList(measurement));

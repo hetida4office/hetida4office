@@ -13,7 +13,7 @@ import java.time.Instant;
 @NoArgsConstructor
 @Builder
 public class Measurement implements Serializable {
-   private static final long serialVersionUID = -7327452512286172439L;
+    private static final long serialVersionUID = -7327452512286172439L;
     private String channelId;
     private Instant timestamp;
     private BigDecimal measurement;

@@ -14,18 +14,16 @@ import java.util.concurrent.TimeUnit;
 public class H4OSingletonMqttClient {
     private static Mqtt5AsyncClient client = null;
     private final String mqttBrokerHost;
-    private final int mqttBrokerPort;
 
     public H4OSingletonMqttClient(@Value("${mqtt.broker.host}") final String mqttBrokerHost,
                                   @Value("${mqtt.broker.port}") final int mqttBrokerPort) {
         this.mqttBrokerHost = mqttBrokerHost;
-        this.mqttBrokerPort = mqttBrokerPort;
         if (client == null) {
             final String uuid = UUID.randomUUID().toString();
             client = Mqtt5Client.builder()
                     .identifier(uuid)
                     .serverHost(this.mqttBrokerHost)
-                    .serverPort(this.mqttBrokerPort)
+                    .serverPort(mqttBrokerPort)
                     .automaticReconnect()
                     .initialDelay(500, TimeUnit.MILLISECONDS)
                     .maxDelay(1, TimeUnit.MINUTES)
@@ -45,14 +43,5 @@ public class H4OSingletonMqttClient {
             return;
         }
         log.info("Client was already connected...");
-    }
-
-    public void disconnect() {
-        if (client.getState().isConnected()) {
-            log.info("Disconnecting client...");
-            client.disconnect();
-            return;
-        }
-        log.info("Client was already disconnected...");
     }
 }
