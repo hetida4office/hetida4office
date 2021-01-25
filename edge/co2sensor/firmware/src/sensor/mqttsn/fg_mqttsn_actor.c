@@ -114,8 +114,7 @@ static void fg_mqttsn_init(void)
     APP_SCHED_INIT(SCHED_EVENT_DATA_SIZE, SCHED_QUEUE_SIZE);
 
     fg_bsp_actor_init();
-    LEDS_CONFIGURE(LEDS_MASK);
-    bsp_board_leds_off();
+    bsp_board_led_on(BSP_BOARD_LED_1);
 }
 
 static void fg_mqttsn_thread_state_changed_cb(uint32_t flags, void * p_context);

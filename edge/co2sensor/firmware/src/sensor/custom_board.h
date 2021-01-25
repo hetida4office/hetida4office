@@ -22,7 +22,11 @@
 
 #define BUTTONS_NUMBER 1
 
+#ifdef PIN_SWITCH1
 #define BUTTON_1       PIN_SWITCH1
+#else
+#define BUTTON_1       PIN_SWITCH
+#endif
 #define BUTTON_PULL    NRF_GPIO_PIN_PULLUP
 
 #define BUTTONS_ACTIVE_STATE 0

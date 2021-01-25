@@ -15,7 +15,7 @@
       arm_simulator_memory_simulation_parameter="RWX 00000000,00100000,FFFFFFFF;RWX 20000000,00010000,CDCDCDCD"
       arm_target_device_name="nRF52840_xxAA"
       arm_target_interface_type="SWD"
-      c_preprocessor_definitions="APP_TIMER_V2;APP_TIMER_V2_RTC1_ENABLED;BOARD_CUSTOM;PINS_CUSTOM;CONFIG_GPIO_AS_PINRESET;CONFIG_NFCT_PINS_AS_GPIOS;FLOAT_ABI_HARD;INITIALIZE_USER_SECTIONS;MBEDTLS_CONFIG_FILE=&quot;nrf-config.h&quot;;MBEDTLS_USER_CONFIG_FILE=&quot;nrf52840-mbedtls-config.h&quot;;MBR_PRESENT;NO_VTOR_CONFIG;NRF52840_XXAA;OPENTHREAD_CONFIG_ENABLE_BUILTIN_MBEDTLS=0;OPENTHREAD_CONFIG_FILE=&quot;openthread-config-wrap.h&quot;;OPENTHREAD_MTD=1;USBD_POWER_DETECTION=1"
+      c_preprocessor_definitions="APP_TIMER_V2;APP_TIMER_V2_RTC1_ENABLED;BOARD_CUSTOM;PINS_FINAL;CONFIG_GPIO_AS_PINRESET;CONFIG_NFCT_PINS_AS_GPIOS;FLOAT_ABI_HARD;INITIALIZE_USER_SECTIONS;MBEDTLS_CONFIG_FILE=&quot;nrf-config.h&quot;;MBEDTLS_USER_CONFIG_FILE=&quot;nrf52840-mbedtls-config.h&quot;;MBR_PRESENT;NO_VTOR_CONFIG;NRF52840_XXAA;OPENTHREAD_CONFIG_ENABLE_BUILTIN_MBEDTLS=0;OPENTHREAD_CONFIG_FILE=&quot;openthread-config-wrap.h&quot;;OPENTHREAD_MTD=1;USBD_POWER_DETECTION=1"
       c_user_include_directories=".;../sdk/components;../sdk/components/boards;../sdk/components/drivers_nrf/nrf_soc_nosd;../sdk/components/libraries/atomic;../sdk/components/libraries/atomic_fifo;../sdk/components/libraries/balloc;../sdk/components/libraries/bsp;../sdk/components/libraries/button;../sdk/components/libraries/delay;../sdk/components/libraries/experimental_section_vars;../sdk/components/libraries/log;../sdk/components/libraries/memobj;../sdk/components/libraries/log/src;../sdk/components/libraries/mem_manager;../sdk/components/libraries/mutex;../sdk/components/libraries/pwr_mgmt;../sdk/components/libraries/queue;../sdk/components/libraries/ringbuf;../sdk/components/libraries/scheduler;../sdk/components/libraries/sortlist;../sdk/components/libraries/strerror;../sdk/components/libraries/timer;../sdk/components/libraries/usbd;../sdk/components/libraries/usbd/class/cdc;../sdk/components/libraries/usbd/class/cdc/acm;../sdk/components/libraries/util;../sdk/components/softdevice/mbr/headers;../sdk/components/thread/utils;../sdk/components/thread/mqtt_sn/mqtt_sn_client;../sdk/components/toolchain/cmsis/include;../sdk/external/fprintf;../sdk/external/nrf_security/config;../sdk/external/nrf_security/include;../sdk/external/nrf_security/mbedtls_plat_config;../sdk/external/nrf_security/nrf_cc310_plat/include;../sdk/external/openthread/include;../sdk/external/openthread/project/config;../sdk/external/openthread/project/nrf52840;../sdk/external/paho/mqtt-sn/mqttsn_packet;../sdk/external/segger_rtt;../sdk/external/utf_converter;../sdk/integration/nrfx;../sdk/integration/nrfx/legacy;../sdk/modules/nrfx;../sdk/modules/nrfx/hal;../sdk/modules/nrfx/mdk;../sdk/modules/nrfx/drivers/include;../sdk/external/openthread/include"
       debug_register_definition_file="../sdk/modules/nrfx/mdk/nrf52840.svd"
       debug_start_from_entry_point_symbol="No"
@@ -50,7 +50,8 @@
     </folder>
     <folder Name="pins">
       <file file_name="pins/itsybitsy.h" />
-      <file file_name="pins/custom.h" />
+      <file file_name="pins/prototype.h" />
+      <file file_name="pins/final.h" />
     </folder>
     <folder Name="lpcomp">
       <file file_name="lpcomp/fg_lpcomp_actor.c" />
