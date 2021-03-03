@@ -1,3 +1,0 @@
-(sym_lib_table
-  (lib (name lp8-module)(type Legacy)(uri ${KIPRJMOD}/lp8-module.lib)(options "")(descr ""))
-)
